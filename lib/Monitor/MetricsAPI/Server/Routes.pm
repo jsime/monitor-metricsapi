@@ -1,15 +1,15 @@
 use strict;
 use warnings;
 
-package Monitor::MetricsAPI::Server::Base;
+package Monitor::MetricsAPI::Server::Routes;
 
 use Dancer2;
 
-set serializer => 'JSON';
+set serializer => 'Mutable';
 
 =head1 NAME
 
-Monitor::MetricsAPI::Server::Base
+Monitor::MetricsAPI::Server::Routes
 
 =head1 SYNOPSIS
 
@@ -17,6 +17,8 @@ You should not interact with this module directly in your code. Please refer to
 L<Monitor::MetricsAPI> for how to integrate this service with your application.
 
 =head1 DESCRIPTION
+
+The base Dancer2 application which provides HTTP API routes for MetricsAPI.
 
 =cut
 
