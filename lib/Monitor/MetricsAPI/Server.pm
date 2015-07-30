@@ -6,7 +6,7 @@ package Monitor::MetricsAPI::Server;
 use Plack::Builder;
 use Twiggy::Server;
 
-use Monitor::MetricsAPI::Server::Base;
+use Monitor::MetricsAPI::Server::Routes;
 
 =head1 NAME
 
@@ -21,6 +21,16 @@ L<Monitor::MetricsAPI> for how to integrate this service with your application.
 
 =cut
 
+=head1 METHODS
+
+=head2 new ($address, $port)
+
+Constructs and returns a Twiggy::Server object with a single Dancer2 service
+registered at / which will handle all incoming HTTP API requests. Both $address
+and $port are optional, and will default to '127.0.0.1' and 8200, respectively.
+
+=cut
+
 sub new {
     my ($class, $address, $port) = @_;
 
@@ -32,7 +42,7 @@ sub new {
         port => $port,
     );
     $server->register_service(builder {
-        mount '/' => Monitor::MetricsAPI::Server::Base->to_app
+        mount '/' => Monitor::MetricsAPI::Server::Routes->to_app
     });
 
     return $server;
