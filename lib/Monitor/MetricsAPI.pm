@@ -7,8 +7,8 @@ package Monitor::MetricsAPI;
 use namespace::autoclean;
 use Moose;
 use MooseX::ClassAttribute;
-use Scalar::Util qw( blessed );
-use Try::Tiny;
+
+use Monitor::MetricsAPI::Collector;
 
 =head1 NAME
 
@@ -18,7 +18,7 @@ Monitor::MetricsAPI - Metrics collection and reporting for Perl applications.
 
     use Monitor::MetricsAPI;
 
-    my $collector = Monitor::MetricsAPI->new(
+    my $collector = Monitor::MetricsAPI->create(
         listen => '*:8000',
         metrics => {
             messages => {
@@ -50,8 +50,8 @@ those statistics via a JSON-over-HTTP API for consumption by external systems
 monitoring tools.
 
 Using Monitor::MetricsAPI first requires that you create the metrics collector
-(and accompanying reporting server), by calling new() and providing it with an
-address and port to which it should listen. Additionally, any metrics you
+(and accompanying reporting server), by calling create() and providing it with
+an address and port to which it should listen. Additionally, any metrics you
 wish the collector to track should be defined.
 
 The example above has created a new collector which will listen to all network
@@ -76,43 +76,33 @@ methods:
 
 class_has 'collector' => (
     is        => 'ro',
-    isa       => 'Monitor::MetricsAPI',
+    isa       => 'Monitor::MetricsAPI::Collector',
     predicate => '_has_global',
     writer    => '_set_global',
 );
 
-has 'servers' => (
-    is      => 'ro',
-    isa     => 'ArrayRef[Monitor::MetricsAPI::Server]',
-    default => sub { [] },
-);
-
-has 'metrics' => (
-    is      => 'ro',
-    isa     => 'HashRef',
-    default => sub { {} },
-);
-
-sub BUILDARGS {
-    # TODO: Convert 'listen' to address/port attributes
-}
-
-sub BUILD {
-    my ($self) = @_;
-
-    $self->_set_global($self) unless $self->_has_global;
-
-    # TODO: Create all of the metric objects.
-}
-
 =head1 METHODS
 
-=head2 new ( listen => '...', metrics => { ... } )
+=head2 create ( listen => '...', metrics => { ... } )
 
 Creates a new collector, which in turn initializes the defined metrics and
 binds to the provided network interfaces and ports.
 
 =cut
+
+sub create {
+    my ($class, @args) = @_;
+
+    return $class->collector if $class->_has_global;
+
+    $class->_set_global(
+        Monitor::MetricsAPI::Collector->new(
+            @args
+        )
+    );
+
+    return $class->collector;
+}
 
 =head2 metric ($name)
 
@@ -157,28 +147,10 @@ Retrieving the current value of a metric:
 =cut
 
 sub metric {
-    my $self = shift;
-    try {
-        $self = $self->collector
-            unless blessed($self) && $self->isa('Monitor::MetricsAPI');
-    } catch {
-        warn "metric method called with an invalid context";
-        return;
-    }
+    my $class = shift;
 
-    my ($name) = @_;
-
-    unless (defined $name) {
-        warn "cannot retrieve metric value without a name";
-        return;
-    }
-
-    unless (exists $self->metrics->{$name}) {
-        warn "the metric $name does not exist";
-        return;
-    }
-
-    return $self->metrics->{$name};
+    die "no collector has been created yet" unless $class->_has_global;
+    return $class->collector->metric(@_);
 }
 
 =head2 add_metric ($name, $type, $callback)
@@ -199,46 +171,10 @@ L<Monitor::MetricsAPI::Metric> for details on individual metric types.
 =cut
 
 sub add_metric {
-    my $self = shift;
-    try {
-        $self = $self->collector
-            unless blessed($self) && $self->isa('Monitor::MetricsAPI');
-    } catch {
-        warn "metric method called with an invalid context";
-        return;
-    }
+    my $class = shift;
 
-    my ($name, $type, $callback) = @_;
-
-    unless (defined $name && defined $type) {
-        warn "metric creation requires a name and type";
-        return;
-    }
-
-    if ($type eq 'callback' && (!defined $callback || ref($callback) ne 'CODE')) {
-        warn "callback metrics must also provide a subroutine";
-        return;
-    }
-
-    if (exists $self->metrics->{$name}) {
-        return if $self->metrics->{$name}->type eq $type;
-        warn "metric $name already exists, but is not of type $type";
-        return;
-    }
-
-    my $metric = Monitor::MetricsAPI::Metric->new(
-        type => $type,
-        name => $name,
-        ( $type eq 'callback' ? ( callback => $callback ) : ())
-    );
-
-    unless (defined $metric) {
-        warn "could not create the metric $name";
-        return;
-    }
-
-    $self->metrics->{$metric->name} = $metric;
-    return $metric;
+    die "no collector has been created yet" unless $class->_has_global;
+    return $class->collector->add_metric(@_);
 }
 
 =head1 DEPENDENCIES
