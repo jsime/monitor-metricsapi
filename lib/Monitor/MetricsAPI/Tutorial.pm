@@ -53,6 +53,16 @@ great choice, too.
 
 =head1 INSTRUMENTING FOR FUN AND PROFIT
 
+=head2 What exactly is "instrumenting"?
+
+Instrumenting refers to the addition of code to your application for the sole
+purpose of tracking its events and behavior, as opposed to code which provides
+"functionality," and making that data available outside the application in one
+manner or another so that it can be analyzed. The data can help to reveal any
+number of problems or inefficiencies that might otherwise go undetected.
+
+=head2 How does it affect my application?
+
 From the application developer's perspective, Monitor::MetricsAPI is a Perl
 module like any other that you use into your own code, most likely early on
 when you're setting up all your other event loop listeners, timers, callbacks,
@@ -67,19 +77,9 @@ some or all of the values the application developer has decided to track.
 "There are 5,617 users connected right now." "15 packets have been dropped."
 "I last received a ping from the database connection pooler at <timestamp>."
 
-=head2 What exactly is "instrumenting"?
+=head2 How is this different from using log files?
 
-Instrumenting refers to the addition of code to your application for the sole
-purpose of tracking its events and behavior, as opposed to code which provides
-"functionality," and making that data available outside the application in one
-manner or another so that it can be analyzed. The data can help to reveal any
-number of problems or inefficiencies that might otherwise go undetected.
-
-
-
-=head2 How is this different from logging application errors?
-
-Error logging is all well and good, and most applications should probably be
+Event logging is all well and good, and most applications should probably be
 doing it, even if they also provide metrics instrumentation. And it is possible
 that many of the things you may decide to instrument could also be included in
 a comprehensive error and event logging mechanism.
@@ -91,7 +91,7 @@ spawned, and how close to the maximum limit of workers each process currently
 is? Or you want to know if a process received a HUP signal and is reloading its
 runtime configuration?
 
-Sure, some times can be reconstructed from log files, but in many cases there
+Sure some of these can be reconstructed from log files, but in many cases there
 are things you might want to know about your application's current state before
 it reaches a log, or aggregated stats that would require a bunch of log parsing
 to figure out (How many messages since the last restart?) Seems a lot easier to
@@ -127,18 +127,41 @@ know both (use a counter and a timestamp).
 
 =head1 ADDING METRICS TO YOUR APPLICATION
 
+=head2 Creating a Collector
 
+The I<collector> is a Monitor::MetricsAPI object you create in your application
+which is used to manage the HTTP API server and keep track of all the metrics
+you define, so called because it is what collects all your metrics.
+
+Adding Monitor::MetricsAPI to your event-based Perl application is very easy:
+
+    use AnyEvent;
+    use Monitor::MetricsAPI;
+
+    my $c = AnyEvent->condvar;
+
+    my $collector = Monitor::MetricsAPI->new(
+        listen  => '<address>:<port>', # defaults to localhost:8200
+        metrics => {
+            # ... define a bunch of metrics, or populate them
+            #     from your application config ...
+        }
+    );
+
+    # ... set up all of your application's event listeners ...
+
+    $c->recv;
+
+And now your application has an embedded HTTP server running on the specified
+interface and port that serves up the metrics API.
 
 =head2 Configuring Metrics at Startup
 
 During collector construction, you may provide a data structure which defines
-all or some (I recommend all - it makes it easier to track later what metrics
-you're intending to provide) of the metrics you wish to expose about your
-application.
-
-This structure defines a hierarchical categorization, making it easy to group
-many related metrics together in a sensible, and (hopefully) somewhat
-self-documenting manner. I hope you like nested hash references.
+all or some of the metrics you wish to expose about your application. This
+structure defines a hierarchical categorization, making it easy to group many
+related metrics together in a sensible, and (hopefully) self-documenting
+manner. I hope you like nested hash references.
 
 A simple metrics definition for a service which receives incoming messages of
 some sort, processes them, and sends responses back - all with a worker thread
