@@ -6,6 +6,8 @@ package Monitor::MetricsAPI::Collector;
 use namespace::autoclean;
 use Moose;
 
+use Monitor::MetricsAPI::MetricFactory;
+
 =head1 NAME
 
 Monitor::MetricsAPI::Collector - Metrics collection object

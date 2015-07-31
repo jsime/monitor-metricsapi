@@ -82,12 +82,6 @@ has 'value' => (
     writer    => '_set_value',
 );
 
-sub BUILD {
-    my ($self) = @_;
-
-    # TODO: Delegate to appropriate subclass.
-}
-
 =head1 BASE METHODS
 
 The following methods are provided for all types of metrics. Additional methods
