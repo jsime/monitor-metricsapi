@@ -45,9 +45,9 @@ sub BUILDARGS {
             foreach my $metric (_parse_metrics_hash($args{'metrics'})) {
                 if (ref($metric->[1]) eq 'CODE') {
                     $m{$metric->[0]} = Monitor::MetricsAPI::MetricFactory->create(
-                        name     => $metric->[0],
-                        type     => 'callback',
-                        callback => $metric->[1],
+                        name => $metric->[0],
+                        type => 'callback',
+                        cb   => $metric->[1],
                     );
                 } else {
                     $m{$metric->[0]} = Monitor::MetricsAPI::MetricFactory->create(
@@ -183,10 +183,10 @@ sub add_metric {
         return;
     }
 
-    my $metric = Monitor::MetricsAPI::Metric->new(
+    my $metric = Monitor::MetricsAPI::MetricFactory->create(
         type => $type,
         name => $name,
-        ( $type eq 'callback' ? ( callback => $callback ) : ())
+        ( $type eq 'callback' ? ( cb => $callback ) : ())
     );
 
     unless (defined $metric) {

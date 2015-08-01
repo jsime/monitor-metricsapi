@@ -76,7 +76,7 @@ has 'type' => (
     required => 1,
 );
 
-has 'value' => (
+has '_value' => (
     is        => 'ro',
     predicate => '_has_value',
     writer    => '_set_value',
@@ -93,6 +93,13 @@ may be provided by individual metric types.
 Returns the current value of the metric.
 
 =cut
+
+sub value {
+    my ($self) = @_;
+
+    return unless $self->_has_value;
+    return $self->_value;
+}
 
 =head2 set ($value)
 

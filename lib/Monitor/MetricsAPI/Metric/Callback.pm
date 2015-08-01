@@ -51,9 +51,10 @@ be explicitly set to either true or false.
 =cut
 
 has 'cb' => (
-    is        => 'rw',
+    is        => 'ro',
     isa       => 'CodeRef',
     predicate => '_has_cb',
+    writer    => '_set_cb',
 );
 
 =head1 METHODS
@@ -63,6 +64,23 @@ L<Monitor::MetricsAPI::Metric>. You may call the set() method at any time to
 updated the callback function that will be used when the metric is displayed.
 
 =cut
+
+=head2 callback (sub { ... })
+
+Allows you to provide a new subroutine to be invoked for the callback metric.
+
+=cut
+
+sub callback {
+    my ($self, $sub) = @_;
+
+    unless (defined $sub && ref($sub) eq 'CODE') {
+        warn "must provide subroutine for callback";
+        return;
+    }
+
+    return $self->_set_cb($sub);
+}
 
 =head2 value
 
@@ -76,11 +94,15 @@ so that unnecessary computations can be avoided during metrics reporting.
 sub value {
     my ($self) = @_;
 
+    my $v;
+
     try {
-        # TODO: Invoke callback sub instead of base class using the value attribute.
+        $v = &{$self->cb};
     } catch {
-        # TODO: Do something predictable when the callback dies.
-    }
+        warn "could not invoke callback metric's subroute";
+    };
+
+    return $v;
 }
 
 =head1 AUTHORS
