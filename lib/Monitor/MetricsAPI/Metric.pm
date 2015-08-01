@@ -80,6 +80,7 @@ has 'value' => (
     is        => 'ro',
     predicate => '_has_value',
     writer    => '_set_value',
+    clearer   => '_clear_value',
 );
 
 =head1 BASE METHODS

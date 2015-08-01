@@ -46,7 +46,7 @@ Sets the metric to true.
 sub true {
     my ($self) = @_;
 
-    return $self->_set_value('T');
+    return $self->_set_value(1);
 }
 
 =head2 false
@@ -58,7 +58,7 @@ Sets the metric to false.
 sub false {
     my ($self) = @_;
 
-    return $self->_set_value('F');
+    return $self->_set_value(0);
 }
 
 =head2 unknown
