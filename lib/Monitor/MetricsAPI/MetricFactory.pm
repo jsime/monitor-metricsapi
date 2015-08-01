@@ -72,7 +72,8 @@ sub create {
     die "must pass metric options as a hash" unless %options;
     die "must indicate the type of metric to create" unless exists $options{'type'};
 
-    my $pkg = "Monitor::MetricsAPI::Metric::$options{'type'}";
+    my $type = ucfirst($options{'type'});
+    my $pkg = "Monitor::MetricsAPI::Metric::$type";
 
     die $options{'type'} . " is not a valid metric type" unless is_loaded($pkg);
 

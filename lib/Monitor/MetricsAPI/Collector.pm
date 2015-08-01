@@ -6,6 +6,7 @@ package Monitor::MetricsAPI::Collector;
 use namespace::autoclean;
 use Moose;
 
+use Data::Dumper;
 use Monitor::MetricsAPI::MetricFactory;
 
 =head1 NAME
@@ -27,6 +28,64 @@ has 'metrics' => (
     isa     => 'HashRef',
     default => sub { {} },
 );
+
+sub BUILDARGS {
+    my $class = shift;
+    my %args;
+
+    if (@_ == 1 && ref($_[0]) eq 'HASH') {
+        %args = %{$_[0]};
+    } elsif (@_ % 2 == 0) {
+        %args = @_;
+    }
+
+    if (exists $args{'metrics'}) {
+        if (ref($args{'metrics'}) eq 'HASH') {
+            my %m;
+            foreach my $metric (_parse_metrics_hash($args{'metrics'})) {
+                if (ref($metric->[1]) eq 'CODE') {
+                    $m{$metric->[0]} = Monitor::MetricsAPI::MetricFactory->create(
+                        name     => $metric->[0],
+                        type     => 'callback',
+                        callback => $metric->[1],
+                    );
+                } else {
+                    $m{$metric->[0]} = Monitor::MetricsAPI::MetricFactory->create(
+                        name => $metric->[0],
+                        type => $metric->[1],
+                    );
+                }
+            }
+            $args{'metrics'} = \%m;
+        } else {
+            warn "metrics option must be provided as a hashref";
+        }
+    }
+
+    return \%args;
+}
+
+sub _parse_metrics_hash {
+    my ($metrics, @groups) = @_;
+
+    my @m;
+
+    foreach my $k (keys %{$metrics}) {
+        if (ref($metrics->{$k}) eq 'HASH') {
+            push(@m, _parse_metrics_hash($metrics->{$k}, @groups, $k));
+        } else {
+            push(@m, [_make_metric_name(@groups, $k), $metrics->{$k}]);
+        }
+    }
+
+    return @m;
+}
+
+sub _make_metric_name {
+    my (@groups, $metric) = @_;
+
+    return join('/', grep { defined $_ && $_ =~ m{\w+} } (@groups, $metric));
+}
 
 =head1 METHODS
 
