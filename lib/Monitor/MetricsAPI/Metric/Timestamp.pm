@@ -49,7 +49,7 @@ Sets the value of the timestamp metric to the current time.
 sub now {
     my ($self) = @_;
 
-    $self->_set_dt(DateTime->now( timezone => 'UTC' ));
+    $self->_set_dt(DateTime->now( time_zone => 'UTC' ));
     return $self->_set_value($self->dt->iso8601 . 'Z');
 }
 
