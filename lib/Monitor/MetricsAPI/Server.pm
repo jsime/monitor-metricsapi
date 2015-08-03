@@ -27,14 +27,14 @@ L<Monitor::MetricsAPI> for how to integrate this service with your application.
 
 Constructs and returns a Twiggy::Server object with a single Dancer2 service
 registered at / which will handle all incoming HTTP API requests. Both $address
-and $port are optional, and will default to '127.0.0.1' and 8200, respectively.
+and $port are optional, and will default to '0.0.0.0' and 8200, respectively.
 
 =cut
 
 sub new {
     my ($class, $address, $port) = @_;
 
-    $address //= '127.0.0.1';
+    $address //= '0.0.0.0';
     $port    //= 8200;
 
     my $server = Twiggy::Server->new(
@@ -42,7 +42,7 @@ sub new {
         port => $port,
     );
     $server->register_service(builder {
-        mount '/' => Monitor::MetricsAPI::Server::Routes->to_app
+        mount '/' => Monitor::MetricsAPI::Server::Routes->to_app;
     });
 
     return $server;

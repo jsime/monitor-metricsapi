@@ -5,9 +5,10 @@ package Monitor::MetricsAPI::Collector;
 
 use namespace::autoclean;
 use Moose;
+use Socket qw(:addrinfo SOCK_RAW);
 
-use Data::Dumper;
 use Monitor::MetricsAPI::MetricFactory;
+use Monitor::MetricsAPI::Server;
 
 =head1 NAME
 
@@ -28,8 +29,8 @@ setting up your application's usage of this library.
 
 has 'servers' => (
     is      => 'ro',
-    isa     => 'ArrayRef[Monitor::MetricsAPI::Server]',
-    default => sub { [] },
+    isa     => 'HashRef',
+    default => sub { {} },
 );
 
 has 'metrics' => (
@@ -71,6 +72,21 @@ sub BUILDARGS {
         }
     }
 
+    if (exists $args{'listen'}) {
+        my ($hosts, $port) = _split_host_and_port($args{'listen'});
+
+        $args{'servers'} = {};
+
+        foreach my $host_ip (@{$hosts}) {
+            my $listen = "$host_ip:$port";
+            next if exists $args{'servers'}{$listen};
+
+            $args{'servers'}{$listen} = Monitor::MetricsAPI::Server->new(
+                $host_ip, $port
+            );
+        }
+    }
+
     return \%args;
 }
 
@@ -94,6 +110,36 @@ sub _make_metric_name {
     my (@groups, $metric) = @_;
 
     return join('/', grep { defined $_ && $_ =~ m{\w+} } (@groups, $metric));
+}
+
+sub _split_host_and_port {
+    my ($listen) = @_;
+
+    my ($addr, $port) = split(':', $listen);
+
+    die "address may not be omitted and must be a hostname, an IP, or an asterisk"
+        unless defined $addr && $addr =~ m{\S+};
+    die "port must be a number (or omitted entirely to use default)"
+        if defined $port && $port ne '' && $port !~ m{^\d+$};
+
+    $port = 8200 unless defined $port && $port ne '';
+
+    my $hosts = [];
+
+    if ($addr eq '*') {
+        $hosts = ['0.0.0.0'];
+    } else {
+        my ($err, @res) = getaddrinfo($addr, "", {socktype => SOCK_RAW});
+        die "could not resolve $addr: $err" if $err;
+        foreach (@res) {
+            my $ipaddr;
+            ($err, $ipaddr) = getnameinfo($_->{'addr'}, NI_NUMERICHOST, NIx_NOSERV);
+            die "could not lookup $_->{'addr'}: $err" if $err;
+            push(@{$hosts}, $ipaddr);
+        }
+    }
+
+    return ($hosts, $port);
 }
 
 =head1 METHODS
@@ -236,6 +282,45 @@ sub add_metric {
 
     $self->metrics->{$metric->name} = $metric;
     return $metric;
+}
+
+=head2 add_server ($listen)
+
+Adds a new HTTP server listener to the collector. The $listen argument must be
+a string in the form of "<address>:<port>" where address may be an asterisk to
+indicate all interfaces should be listened on, and where port (as well as the
+leading colon) may be omitted if you wish to use the default port of 8200.
+
+Examples:
+
+    $collector->add_server('*:8201');
+    $collector->add_server('127.0.0.1:8202');
+    $collector->add_server('192.168.1.1');
+
+You may add as many servers as you like. If you attempt to bind to the same
+address and port combination more than once, a warning will be emitted and no
+action will be taken.
+
+=cut
+
+sub add_server {
+    my ($self, $listen) = @_;
+
+    return unless defined $listen;
+
+    my ($hosts, $port) = _split_host_and_port($listen);
+
+    foreach my $host_ip (@{$hosts}) {
+        my $listen = "$host_ip:$port";
+        if (exists $self->servers->{$listen}) {
+            warn "already listening on $listen";
+            next;
+        }
+
+        $self->servers->{$listen} = Monitor::MetricsAPI::Server->new(
+            $host_ip, $port
+        );
+    }
 }
 
 =head1 AUTHORS

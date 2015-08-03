@@ -45,9 +45,9 @@ Monitor::MetricsAPI - Metrics collection and reporting for Perl applications.
 =head1 DESCRIPTION
 
 Monitor::MetricsAPI provides functionality for the collection of arbitrary
-application metrics within any Perl application, as well as the reporting of
-those statistics via a JSON-over-HTTP API for consumption by external systems
-monitoring tools.
+application metrics within any event-driven Perl application, as well as the
+reporting of those statistics via a JSON-over-HTTP API for consumption by
+external systems monitoring tools.
 
 Using Monitor::MetricsAPI first requires that you create the metrics collector
 (and accompanying reporting server), by calling create() and providing it with
@@ -102,18 +102,20 @@ sub create {
             if (exists $args{'metrics'}) {
                 $class->collector->add_metrics($args{'metrics'});
             }
-        }
 
-        return $class->collector;
+            if (exists $args{'listen'}) {
+                $class->collector->add_server($args{'listen'});
+            }
+        }
     } else {
         $class->_set_global(
             Monitor::MetricsAPI::Collector->new(
                 @args
             )
         );
-
-        return $class->collector;
     }
+
+    return $class->collector;
 }
 
 =head2 metric ($name)
@@ -122,7 +124,7 @@ Returns the L<Monitor::MetricsAPI::Metric> object for the given name. Metric
 names are collapsed to a slash-delimited string, which mirrors the path used
 by the reporting HTTP server to display individual metrics. Thus, this:
 
-    Monitor::MetricsAPI->new(
+    Monitor::MetricsAPI->create(
         metrics => {
             server => {
                 version => {

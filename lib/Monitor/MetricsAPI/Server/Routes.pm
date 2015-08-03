@@ -5,7 +5,7 @@ package Monitor::MetricsAPI::Server::Routes;
 
 use Dancer2;
 
-set serializer => 'Mutable';
+set serializer => 'JSON';
 
 =head1 NAME
 
