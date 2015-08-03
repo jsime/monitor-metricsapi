@@ -15,6 +15,15 @@ Monitor::MetricsAPI::Collector - Metrics collection object
 
 =head1 SYNOPSIS
 
+You should not create your own objects from this module directly. All Collector
+objects should be instantiated through the L<Monitor::MetricsAPI> module's
+create() method. Please refer to that module's documentation for information on
+setting up your application's usage of this library.
+
+=cut
+
+=head1 DESCRIPTION
+
 =cut
 
 has 'servers' => (
@@ -145,6 +154,37 @@ sub metric {
     }
 
     return $self->metrics->{$name};
+}
+
+=head2 add_metrics (\%metrics)
+
+Accepts a hashref of hierarchical metric definitions (please see documentation
+in L<Monitor::MetricsAPI::Tutorial> for a more complete description). Used to
+bulk-add metrics to a collector.
+
+=cut
+
+sub add_metrics {
+    my ($self, $metrics) = @_;
+
+    return unless defined $metrics && ref($metrics) eq 'HASH';
+
+    foreach my $metric (_parse_metrics_hash($metrics)) {
+        if (ref($metric->[1]) eq 'CODE') {
+            $self->metrics->{$metric->[0]} = Monitor::MetricsAPI::MetricFactory->create(
+                name => $metric->[0],
+                type => 'callback',
+                cb   => $metric->[1],
+            );
+        } else {
+            $self->metrics->{$metric->[0]} = Monitor::MetricsAPI::MetricFactory->create(
+                name => $metric->[0],
+                type => $metric->[1],
+            );
+        }
+    }
+
+    return 1;
 }
 
 =head2 add_metric ($name, $type, $callback)

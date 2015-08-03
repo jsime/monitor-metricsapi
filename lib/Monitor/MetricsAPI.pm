@@ -86,22 +86,34 @@ class_has 'collector' => (
 =head2 create ( listen => '...', metrics => { ... } )
 
 Creates a new collector, which in turn initializes the defined metrics and
-binds to the provided network interfaces and ports.
+binds to the provided network interfaces and ports. If there is already a
+global collector, then any metric definitions passed into this class method
+will be added to the existing collector before it is returned.
 
 =cut
 
 sub create {
     my ($class, @args) = @_;
 
-    return $class->collector if $class->_has_global;
+    if ($class->_has_global) {
+        if (@args && @args % 2 == 0) {
+            my %args = @args;
 
-    $class->_set_global(
-        Monitor::MetricsAPI::Collector->new(
-            @args
-        )
-    );
+            if (exists $args{'metrics'}) {
+                $class->collector->add_metrics($args{'metrics'});
+            }
+        }
 
-    return $class->collector;
+        return $class->collector;
+    } else {
+        $class->_set_global(
+            Monitor::MetricsAPI::Collector->new(
+                @args
+            )
+        );
+
+        return $class->collector;
+    }
 }
 
 =head2 metric ($name)
