@@ -53,7 +53,28 @@ should exercise care in your calls to this route.
 =cut
 
 get '/all' => sub {
-    return { status => 'ok' };
+    my $coll = Monitor::MetricsAPI->collector;
+
+    return { status => 'collector_fail', message => 'Could not access metrics collector.' }
+        unless defined $coll;
+
+    return { status => 'no_metrics', message => 'The collector does not have any metrics defined.' }
+        unless scalar(keys(%{$coll->metrics})) > 0;
+
+    my $response = {
+        status  => 'ok',
+        message => 'Request processed successfully.',
+        service => {
+            name    => 'Monitor::MetricsAPI',
+            version => $Monitor::MetricsAPI::VERSION,
+        },
+        metrics => {
+        }
+    };
+
+    $response->{'metrics'}{$_->name} = $_->value for values %{$coll->metrics};
+
+    return $response;
 };
 
 =head2 /metric/**
@@ -71,7 +92,27 @@ a common namespace, use the /metrics/ route instead.
 get '/metric/**' => sub {
     my ($mparts) = splat;
 
-    return { status => 'ok' };
+    my $coll = Monitor::MetricsAPI->collector;
+    my $metric_name = join('/', @{$mparts});
+
+    return { status => 'collector_fail', message => 'Could not access metrics collector.' }
+        unless defined $coll;
+    return { status => 'not_found', message => 'Invalid metric name provided.' }
+        unless exists $coll->metrics->{$metric_name};
+
+    my $metric = $coll->metric($metric_name);
+
+    return {
+        status  => 'ok',
+        message => 'Request processed successfully.',
+        service => {
+            name    => 'Monitor::MetricsAPI',
+            version => $Monitor::MetricsAPI::VERSION,
+        },
+        metrics => {
+            $metric->name => $metric->value
+        }
+    };
 };
 
 =head2 /metrics/**
@@ -114,7 +155,37 @@ some circumstances.
 get '/metrics/**' => sub {
     my ($nsparts) = splat;
 
-    return { status => 'ok' };
+    my $coll = Monitor::MetricsAPI->collector;
+    my $prefix = join('/', @{$nsparts});
+
+    return { status => 'collector_fail', message => 'Could not access metrics collector.' }
+        unless defined $coll;
+
+    return { status => 'no_group', message => 'Must provide metric group prefix.' }
+        unless defined $prefix && $prefix =~ m{\w+};
+
+    my @metrics =
+        map { $coll->metric($_) }
+        grep { $_ =~ m{^$prefix(/|$)} }
+        keys %{$coll->metrics};
+
+    return { status => 'not_found', message => 'Invalid metric group name provided.' }
+        unless @metrics > 0;
+
+    my $response = {
+        status  => 'ok',
+        message => 'Request processed successfully.',
+        service => {
+            name    => 'Monitor::MetricsAPI',
+            version => $Monitor::MetricsAPI::VERSION,
+        },
+        metrics => {
+        }
+    };
+
+    $response->{'metrics'}{$_->name} = $_->value for @metrics;
+
+    return $response;
 };
 
 =head1 OUTPUT FORMATS
