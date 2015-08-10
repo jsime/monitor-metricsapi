@@ -11,6 +11,7 @@ use Monitor::MetricsAPI::Metric::Boolean;
 use Monitor::MetricsAPI::Metric::Callback;
 use Monitor::MetricsAPI::Metric::Counter;
 use Monitor::MetricsAPI::Metric::Gauge;
+use Monitor::MetricsAPI::Metric::List;
 use Monitor::MetricsAPI::Metric::String;
 use Monitor::MetricsAPI::Metric::Timestamp;
 
