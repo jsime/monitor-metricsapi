@@ -43,11 +43,11 @@ test_tcp(
         ok(defined $data && ref($data) eq 'HASH', 'json response decoded');
         cmp_ok($data->{'status'}, 'eq', 'ok', 'api returned status ok');
 
-        ok(exists $data->{'metrics'}{'test/foo'},   'test metric exists in response');
-        ok(! exists $data->{'metrics'}{'test/bar'}, 'metric outside request path does not exist in response');
-        ok(! exists $data->{'metrics'}{'xyzzy'},    'metric outside request path does not exist in response');
+        ok(exists $data->{'metrics'}{'test'}{'foo'},   'test metric exists in response');
+        ok(! exists $data->{'metrics'}{'test'}{'bar'}, 'metric outside request path does not exist in response');
+        ok(! exists $data->{'metrics'}{'xyzzy'},       'metric outside request path does not exist in response');
 
-        cmp_ok($data->{'metrics'}{'test/foo'}, '==', 50, 'expected value of metric found');
+        cmp_ok($data->{'metrics'}{'test'}{'foo'}, '==', 50, 'expected value of metric found');
 
         $resp = $ua->get('http://127.0.0.1:8200/metrics/test');
         eval { $data = decode_json($resp->decoded_content); };
@@ -55,12 +55,12 @@ test_tcp(
         ok($resp->is_success, 'http ok');
         cmp_ok($resp->header('Content-type'), 'eq', 'application/json', 'api response is JSON');
 
-        ok(exists $data->{'metrics'}{'test/foo'}, 'test metric exists in response');
-        ok(exists $data->{'metrics'}{'test/bar'}, 'test metric exists in response');
-        ok(! exists $data->{'metrics'}{'xyzzy'},  'metric outside request path does not exist in response');
+        ok(exists $data->{'metrics'}{'test'}{'foo'}, 'test metric exists in response');
+        ok(exists $data->{'metrics'}{'test'}{'bar'}, 'test metric exists in response');
+        ok(! exists $data->{'metrics'}{'xyzzy'},     'metric outside request path does not exist in response');
 
-        cmp_ok($data->{'metrics'}{'test/foo'}, '==', 50,  'expected value of metric found');
-        cmp_ok($data->{'metrics'}{'test/bar'}, '==', 200, 'expected value of metric found');
+        cmp_ok($data->{'metrics'}{'test'}{'foo'}, '==', 50,  'expected value of metric found');
+        cmp_ok($data->{'metrics'}{'test'}{'bar'}, '==', 200, 'expected value of metric found');
 
         $resp = $ua->get('http://127.0.0.1:8200/all');
         eval { $data = decode_json($resp->decoded_content); };
@@ -68,13 +68,13 @@ test_tcp(
         ok($resp->is_success, 'http ok');
         cmp_ok($resp->header('Content-type'), 'eq', 'application/json', 'api response is JSON');
 
-        ok(exists $data->{'metrics'}{'test/foo'}, 'test metric exists in response');
-        ok(exists $data->{'metrics'}{'test/bar'}, 'test metric exists in response');
-        ok(exists $data->{'metrics'}{'xyzzy'},    'test metric exists in response');
+        ok(exists $data->{'metrics'}{'test'}{'foo'}, 'test metric exists in response');
+        ok(exists $data->{'metrics'}{'test'}{'bar'}, 'test metric exists in response');
+        ok(exists $data->{'metrics'}{'xyzzy'},       'test metric exists in response');
 
-        cmp_ok($data->{'metrics'}{'test/foo'}, '==', 50,  'expected value of metric found');
-        cmp_ok($data->{'metrics'}{'test/bar'}, '==', 200, 'expected value of metric found');
-        cmp_ok($data->{'metrics'}{'xyzzy'},    'eq', 'Nothing happens.', 'expected value of metric found');
+        cmp_ok($data->{'metrics'}{'test'}{'foo'}, '==', 50,  'expected value of metric found');
+        cmp_ok($data->{'metrics'}{'test'}{'bar'}, '==', 200, 'expected value of metric found');
+        cmp_ok($data->{'metrics'}{'xyzzy'},       'eq', 'Nothing happens.', 'expected value of metric found');
     },
     host => '127.0.0.1',
     port => 8200,
