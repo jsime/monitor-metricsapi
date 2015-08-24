@@ -99,7 +99,7 @@ sub value {
     try {
         $v = &{$self->cb};
     } catch {
-        warn "could not invoke callback metric's subroute";
+        warn "could not invoke callback metric's subroutine";
     };
 
     return $v;

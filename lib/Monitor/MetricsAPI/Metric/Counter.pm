@@ -68,6 +68,18 @@ sub increment {
     return $self->add(1);
 }
 
+=head2 incr
+
+Alias for increment()
+
+=cut
+
+sub incr {
+    my ($self) = @_;
+
+    return $self->add(1);
+}
+
 =head1 AUTHORS
 
 Jon Sime <jonsime@gmail.com>

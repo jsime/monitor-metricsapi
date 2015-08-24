@@ -32,12 +32,17 @@ metrics.
 =head2 /
 
 Returns a small JSON structure with metadata about the metrics collector. May
-be used as a heartbeat for the service.
+be used as a heartbeat for the service, as it performs no computations and does
+not invoke any metrics callbacks.
 
 =cut
 
 get '/' => sub {
-    return { status => 'ok' };
+    return {
+        status  => 'ok',
+        message => 'Metrics service alive.',
+        service => _service_info(),
+    };
 };
 
 =head2 /all
@@ -55,26 +60,24 @@ should exercise care in your calls to this route.
 get '/all' => sub {
     my $coll = Monitor::MetricsAPI->collector;
 
-    return { status => 'collector_fail', message => 'Could not access metrics collector.' }
-        unless defined $coll;
+    return {
+        status  => 'collector_fail',
+        message => 'Could not access metrics collector.',
+        service => _service_info(),
+    } unless defined $coll;
 
-    return { status => 'no_metrics', message => 'The collector does not have any metrics defined.' }
-        unless scalar(keys(%{$coll->metrics})) > 0;
+    return {
+        status  => 'no_metrics',
+        message => 'The collector does not have any metrics defined.',
+        service => _service_info(),
+    } unless scalar(keys(%{$coll->metrics})) > 0;
 
-    my $response = {
+    return {
         status  => 'ok',
         message => 'Request processed successfully.',
-        service => {
-            name    => 'Monitor::MetricsAPI',
-            version => $Monitor::MetricsAPI::VERSION,
-        },
-        metrics => {
-        }
+        service => _service_info(),
+        metrics => _expand_metrics(values %{$coll->metrics}),
     };
-
-    $response->{'metrics'} = _expand_metrics(values %{$coll->metrics});
-
-    return $response;
 };
 
 =head2 /metric/**
@@ -95,21 +98,23 @@ get '/metric/**' => sub {
     my $coll = Monitor::MetricsAPI->collector;
     my $metric_name = join('/', @{$mparts});
 
-    return { status => 'collector_fail', message => 'Could not access metrics collector.' }
-        unless defined $coll;
-    return { status => 'not_found', message => 'Invalid metric name provided.' }
-        unless exists $coll->metrics->{$metric_name};
+    return {
+        status  => 'collector_fail',
+        message => 'Could not access metrics collector.',
+        service => _service_info(),
+    } unless defined $coll;
 
-    my $metric = $coll->metric($metric_name);
+    return {
+        status  => 'not_found',
+        message => 'Invalid metric name provided.',
+        service => _service_info(),
+    } unless exists $coll->metrics->{$metric_name};
 
     return {
         status  => 'ok',
         message => 'Request processed successfully.',
-        service => {
-            name    => 'Monitor::MetricsAPI',
-            version => $Monitor::MetricsAPI::VERSION,
-        },
-        metrics => _expand_metrics($metric),
+        service => _service_info(),
+        metrics => _expand_metrics($coll->metric($metric_name)),
     };
 };
 
@@ -156,34 +161,35 @@ get '/metrics/**' => sub {
     my $coll = Monitor::MetricsAPI->collector;
     my $prefix = join('/', @{$nsparts});
 
-    return { status => 'collector_fail', message => 'Could not access metrics collector.' }
-        unless defined $coll;
+    return {
+        status  => 'collector_fail',
+        message => 'Could not access metrics collector.',
+        service => _service_info(),
+    } unless defined $coll;
 
-    return { status => 'no_group', message => 'Must provide metric group prefix.' }
-        unless defined $prefix && $prefix =~ m{\w+};
+    return {
+        status  => 'no_group',
+        message => 'Must provide metric group prefix.',
+        service => _service_info(),
+    } unless defined $prefix && $prefix =~ m{\w+};
 
     my @metrics =
         map { $coll->metric($_) }
         grep { $_ =~ m{^$prefix(/|$)} }
         keys %{$coll->metrics};
 
-    return { status => 'not_found', message => 'Invalid metric group name provided.' }
-        unless @metrics > 0;
+    return {
+        status  => 'not_found',
+        message => 'Invalid metric group name provided.',
+        service => _service_info(),
+    } unless @metrics > 0;
 
-    my $response = {
+    return {
         status  => 'ok',
         message => 'Request processed successfully.',
-        service => {
-            name    => 'Monitor::MetricsAPI',
-            version => $Monitor::MetricsAPI::VERSION,
-        },
-        metrics => {
-        }
+        service => _service_info(),
+        metrics => _expand_metrics(@metrics),
     };
-
-    $response->{'metrics'} = _expand_metrics(@metrics);
-
-    return $response;
 };
 
 sub _expand_metrics {
@@ -206,38 +212,17 @@ sub _expand_metrics {
     return \%m;
 }
 
-=head1 OUTPUT FORMATS
-
-By default, all routes provided by this module return JSON. However, clients
-may request alternate representations if they are easier to consume. Output
-serialization is handled via L<Dancer2::Serializer::Mutable>, which allows
-clients to indicate their preferred format using the HTTP 'Accept-type' header.
-
-Current supported serialization types are:
-
-=over
-
-=item * JSON (Default)
-
-Accept-type: application/json
-
-=item * YAML
-
-Accept-type: text/x-yaml
-
-=item * XML
-
-Accept-type: text/xml
-
-=back
+sub _service_info {
+    return {
+        name    => 'Monitor::MetricsAPI',
+        version => $Monitor::MetricsAPI::VERSION,
+    };
+}
 
 =head1 OUTPUT STRUCTURE
 
 Unless otherwise noted, all routes return a similar data structure to the one
-described in this section. For simplicity, the examples used here will all be
-in the default serializer's JSON notation. The underlying data structure will
-be the same regardless of the chosen serialization method, only its serialized
-representation will differ.
+described in this section.
 
 =head2 Complete Example
 
@@ -246,15 +231,21 @@ representation will differ.
       "service": {
         "name": "Monitor::MetricsAPI",
         "version": "0.001",
-        "host": "127.0.0.1",
-        "port": 8200
       },
       "metrics": {
-        "messages/incoming/total": 5019,
-        "messages/incoming/rejected": 104,
-        "messages/outgoing/total": 1627,
-        "messages/outgoing/suppressed": 5,
-        "users/total": 1928
+        "messages": {
+          "incoming": {
+            "total": 5019,
+            "rejected": 104
+          },
+          "outgoing": {
+            "total": 1627,
+            "suppressed": 5
+          },
+        },
+        "users": {
+          "total": 1928
+        }
       }
     }
 
@@ -264,6 +255,13 @@ The status attribute is present in every response, and anything other than the
 string "ok" indicates an error condition. Responses with a non-"ok" status may
 not contain any additional attributes beyond a message which will contain an
 error message.
+
+Note that the API server will still return an HTTP status code of 200 even when
+there is an error displaying your metrics (e.g. you have requested a metric
+which does not exist). The HTTP status codes are used only for indicating
+whether the HTTP server itself is functioning properly and is able to process
+the incoming HTTP request. HTTP status codes are not overloaded to also serve
+as indicators of metrics "health."
 
 =head2 Message
 
@@ -278,16 +276,21 @@ metrics reporting service.
 =head2 Metrics
 
 The metrics attribute contains an object of all metrics which matched the
-request. In the case of requests to the "/all" route, this will be every metric
+request, nested according to the categories you used when defining your
+metrics. In the case of requests to the "/all" route, this will be every metric
 collected by the service for your application. For both the "/metric" and
-"/metrics" routes, only those metrics which matched your request will appear
-in the object, and all others will be omitted from the output.
+"/metrics" routes, only those metrics which matched your request will appear in
+the object, and all others will be omitted from the output. Callback metrics
+which are not present in the API output are not invoked when constructing the
+response.
 
 The data type of each metric's value will depend on the type of metric that is
 being collected. Counters and gauges will return numbers, boolean metrics will
-return true, false or null, and string metrics will return, well, strings.
-Callback metrics can return any type, entirely dependent upon what the
-subroutine you provided for the callback does.
+return 1 (true), 0 (false), or null, and string metrics will return, well,
+strings. Callback metrics can return any type, entirely dependent upon what the
+subroutine you provided for the callback does. List metrics will return an
+array containing values of whatever type was push()'ed onto the list within
+your application.
 
 =head1 AUTHORS
 

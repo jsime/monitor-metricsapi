@@ -17,8 +17,9 @@ greater insight into the operation of your applications.
 
 =head1 REQUIREMENTS
 
-The direct dependencies of this library are not extensive. At minimum you will
-need the following:
+The direct dependencies of this library are not extensive (though these direct
+dependencies do pull in a fair amount of additional dependencies). At minimum
+you will need the following:
 
 =over
 
@@ -29,7 +30,7 @@ hoping to instrument. One-off glue scripts that exist in the process table
 sporadically and for seconds at a time are not the target consumers of this
 library. Long running applications, background services and daemons, and
 always-on servers that use an event model (any supported by AnyEvent, which is
-thankfully just about all the worthwhile ones in Perl) - those can benefit.
+thankfully just about all of them in Perl) - those can potentially benefit.
 
 =item * Twiggy and Dancer2
 
@@ -57,9 +58,9 @@ great choice, too.
 
 Instrumenting refers to the addition of code to your application for the sole
 purpose of tracking its events and behavior, as opposed to code which provides
-"functionality," and making that data available outside the application in one
-manner or another so that it can be analyzed. The data can help to reveal any
-number of problems or inefficiencies that might otherwise go undetected.
+functionality, and making that data available outside the application in one
+manner or another so that it can be analyzed. The data can help to reveal
+problems or inefficiencies that might otherwise go undetected.
 
 =head2 How does it affect my application?
 
@@ -72,10 +73,10 @@ elsewhere in your application code you note when those trackable events occur.
 created 3 new user records." "I am restarting 'now()'." And so on.
 
 From the operator's perspective, Monitor::MetricsAPI provides an HTTP API which
-can spit out JSON, YAML, XML, and maybe other formats in the future, that show
-some or all of the values the application developer has decided to track.
-"There are 5,617 users connected right now." "15 packets have been dropped."
-"I last received a ping from the database connection pooler at <timestamp>."
+can spit out JSON showing some or all of the values the application developer
+has decided to track. "There are 5,617 users connected right now." "15 packets
+have been dropped." "I last received a ping from the database connection pooler
+at <timestamp>."
 
 =head2 How is this different from using log files?
 
@@ -91,39 +92,41 @@ spawned, and how close to the maximum limit of workers each process currently
 is? Or you want to know if a process received a HUP signal and is reloading its
 runtime configuration?
 
-Sure some of these can be reconstructed from log files, but in many cases there
+Sure, some of these can be reconstructed from log files but in many cases there
 are things you might want to know about your application's current state before
 it reaches a log, or aggregated stats that would require a bunch of log parsing
-to figure out (How many messages since the last restart?) Seems a lot easier to
-be able to just do:
+to figure out (How many messages since the last restart? Average processing
+time for the last 500 requests?) Seems a lot easier to be able to just do:
 
     $ curl http://myserver:8200/metric/workers/current
-    { "workers/current": 17 }
+    { "metrics": {
+        "workers": {
+          "current": 17
+        }
+      }
+    }
 
 Or even better, get back everything your application tracks about its worker
 threads in one go:
 
     $ curl http://myserver:8200/metrics/workers
-    { "workers/current": 17,
-      "workers/limit": 20,
-      "workers/reap_after": "5m",
-      "workers/last_reaped": "2015-07-23T17:22:51Z" }
+    { "metrics": {
+        "workers": {
+          "current": 17,
+          "limit": 20,
+          "reap_after": "5m",
+          "last_reaped": "2015-07-23T17:22:51Z"
+        }
+      }
+    }
 
-And because you can get these metrics back in JSON, YAML, or XML they're a lot
-easier to integrate into external monitoring tools like Nagios, Circonus,
-Sensu, Zabbix, etc. than having to run everything through a log filtering suite
-first, if they're even possible to cull from the logs in the first place.
+[Note that the API actually returns a few more details in every response that
+are omitted from the examples above for brevity.]
 
-=head2 Why instrument?
-
-What is tracked is entirely arbitrary. Monitor::MetricsAPI provides several
-different classes of metrics, from counters to booleans to timestamps and more.
-You get to choose which makes the most sense. Maybe you care how many keepalive
-pings a persistent service connection has sent (use a counter), or maybe you
-only care when the last one was received (use a timestamp). Maybe you want to
-know both (use a counter and a timestamp).
-
-
+And because you can get these metrics back in JSON at any time you wish simply
+by calling the API, instead of having to consume logs or wait for your program
+to complete and print out a summary, they're far easier to integrate into
+external, active monitoring tools like Nagios, Circonus, Sensu, Zabbix, etc.
 
 =head1 ADDING METRICS TO YOUR APPLICATION
 
@@ -140,7 +143,7 @@ Adding Monitor::MetricsAPI to your event-based Perl application is very easy:
 
     my $c = AnyEvent->condvar;
 
-    my $collector = Monitor::MetricsAPI->new(
+    my $collector = Monitor::MetricsAPI->create(
         listen  => '<address>:<port>', # defaults to localhost:8200
         metrics => {
             # ... define a bunch of metrics, or populate them
@@ -154,6 +157,49 @@ Adding Monitor::MetricsAPI to your event-based Perl application is very easy:
 
 And now your application has an embedded HTTP server running on the specified
 interface and port that serves up the metrics API.
+
+=head2 Accessing the Collector
+
+You may have noticed in the previous example that we've created a $collector
+variable at the top level of our application. The natural assumption would then
+follow that everywhere else in your application which you wish to track and
+interact with your metrics is going to need to receive this $collector variable
+somehow and you'll be doomed to passing it around constantly (or adding an
+attribute to your $app object, or something like the same).
+
+Monitor::MetricsAPI tries to simplify this for you by tracking the collector as
+a single, globally-accessible class variable. When you create the very first
+collector instance during your application's initialization, the collector is
+stored (using MooseX::ClassAttribute) in the Monitor::MetricsAPI class. You can
+then access it at any time, from anywhere else in your application, without
+having to pass a single object reference around everywhere.
+
+To simplify things even further, Monitor::MetricsAPI presents the same methods
+to you whether you are using an instance object or the class attribute. Thus,
+the two following methods of retrieving a metric's value are completely
+interchangeable:
+
+    $collector->metric('users/total')->value;
+    Monitor::MetricsAPI->metric('users/total')->value;
+
+If you're going to perform multiple metrics operations in close proximity and
+want to save a few characters on each metric() call, you can also retrieve the
+collector from the class with:
+
+    my $coll = Monitor::MetricsAPI->collector;
+
+Additionally, if you call Monitor::MetricsAPI->create( ... ) more than once,
+you will receive the same collector object back each time. Any new metrics
+which you define in the subsequent create() calls will be merged into the
+original collector, and if you specify a "listen" address and port which are
+not already bound by the API server, they will be used to create another server
+that runs simultaneously.
+
+The only catch: you cannot have multiple, distinct collectors in a single
+application, each with their own unique sets of metrics. (IMHO, that seems like
+such a strange, fringe, unlikely, unwieldly, and quirky thing to want anyway,
+I'm happy to forgo that feature to make accessing the collector so much simpler
+for the vast majority, if not totality, of uses.)
 
 =head2 Configuring Metrics at Startup
 
@@ -220,7 +266,7 @@ to the metric. Simply call the add_metric() method on your collector as so:
 
 Or if you're creating a callback metric (one which invokes a subroutine of your
 choosing every time the metric is requested via the API, or anywhere in your
-application that calls ->value() on the metric object):
+application that calls value() on the metric object):
 
     $collection->add_metric($name, 'callback', sub { ... });
 
@@ -230,9 +276,8 @@ has started doing "things."
 
 =head2 Giving Value to Your Metrics
 
-Either at start or during application operation, you should now have at least
-some metrics defined. But you still need to provide the data that makes those
-metrics mean something.
+You should now have at least some metrics defined. But you still need to
+provide the data that makes those metrics mean something.
 
 How you provide values to a metric can vary slightly depending on the type of
 metric you are tracking. For the full details, please make sure to read the
@@ -248,11 +293,14 @@ prevalent, and manipulating their values is quite easy:
 
 This may be done anywhere in your application that you have access to your
 collector object. What if you can't easily pass that object around everywhere?
-Monitor::MetricsAPI keeps track of the first collector object you create in a
-given process (and most applications will only ever need a single collector),
-and lets you access it globally via a class method, as so:
+Monitor::MetricsAPI keeps track of the collector object globally, and lets you
+access it via class methods, as so:
 
+    # Setting the value on an existing metric via the class method:
     Monitor::MetricsAPI->metric($name)->set($value);
+
+    # Creating a new metric via the class method:
+    Monitor::MetricsAPI->add_metric($name, $type);
 
 The syntax for using both the object and the class method is identical, for
 your convenience.
@@ -302,7 +350,10 @@ by using the group name and the "metrics" endpoint instead of "metric":
     http://<addr>:<port>/metrics/protocols
 
 You may also provide the full name of a single metric to this API endpoint, and
-you will receive only that metric's value in the response.
+you will receive only that metric's value in the response. The advantage to the
+single "metric" endpoint is that you are guaranteed to only have one, specific
+metric in the API's output (in case that ever matters), as passing a metric
+group path to that endpoint will result in an error.
 
 =head2 Viewing all metrics at once
 
@@ -330,34 +381,9 @@ to the number of metrics you have defined.
 
 Feel free to throw all caution to the wind during development and testing.
 
-=head2 Changing the API output format
-
-By default, the HTTP API returns all metrics data in JSON blobs. For the full
-details on each API endpoint's output, refer to the documentation in
-L<Monitor::MetricsAPI::Server::Routes>.
-
-You can elect to receive the output in a serialization format other than JSON,
-if it is easier for your monitoring suite to ingest. This is done by supplying
-the appropriate value in your "Accept-type" HTTP request header. Currently
-supported are:
-
-=over
-
-=item * JSON
-
-Accept-type: application/json
-
-=item * YAML
-
-Accept-type: text/x-yaml
-
-=item * XML
-
-Accept-type: text/xml
-
-=back
-
 =head1 INTEGRATING WITH MONITORING SYSTEMS
+
+This section of the tutorial has not been written yet.
 
 =head1 AUTHORS
 
