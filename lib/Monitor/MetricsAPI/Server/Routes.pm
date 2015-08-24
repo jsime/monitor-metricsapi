@@ -72,7 +72,7 @@ get '/all' => sub {
         }
     };
 
-    $response->{'metrics'}{$_->name} = $_->value for values %{$coll->metrics};
+    $response->{'metrics'} = _expand_metrics(values %{$coll->metrics});
 
     return $response;
 };
@@ -109,9 +109,7 @@ get '/metric/**' => sub {
             name    => 'Monitor::MetricsAPI',
             version => $Monitor::MetricsAPI::VERSION,
         },
-        metrics => {
-            $metric->name => $metric->value
-        }
+        metrics => _expand_metrics($metric),
     };
 };
 
@@ -183,10 +181,30 @@ get '/metrics/**' => sub {
         }
     };
 
-    $response->{'metrics'}{$_->name} = $_->value for @metrics;
+    $response->{'metrics'} = _expand_metrics(@metrics);
 
     return $response;
 };
+
+sub _expand_metrics {
+    my (@metrics) = @_;
+
+    my %m;
+
+    foreach my $metric (@metrics) {
+        my @path = split(m|/|, $metric->name);
+        my $name = pop @path;
+        my $val = $metric->value;
+        my $key = \%m;
+        foreach my $part (@path) {
+            $key->{$part} = {} unless exists $key->{$part};
+            $key = $key->{$part};
+        }
+        $key->{$name} = $val;
+    }
+
+    return \%m;
+}
 
 =head1 OUTPUT FORMATS
 
